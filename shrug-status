@@ -1,0 +1,83 @@
+#!/bin/dash
+
+if [ ! -d ".shrug" ] #Check if .shrug exists
+then
+    echo "shrug-status: error: no .shrug directory containing shrug repository exists"
+    exit 1
+fi
+
+if [ ! -f .shrug/version ] #Check if any commits exist
+then
+    echo "shrug-status: error: your repository does not have any commits yet"
+    exit 1
+fi
+
+index=.shrug/index/*
+ver=`cat .shrug/version`  
+for delFile in $index; do
+    if [ ! -f "${delFile##*/}" ] #Check if file exists in index, that it also doesnt exist in root
+    then
+        echo "${delFile##*/}" >>.shrug/deletedFiles #If it does, add it manually to deletedFiles (caused by rm 'file')
+    fi
+done
+if [ -f .shrug/deletedFiles ] #Check deleted root files
+then
+    while read line; do
+        if [ ! -f "$line" ] #File doesn't exist in root
+        then
+            if [ ! -f .shrug/index/$line ] #File also doesn't exist in index
+            then
+                if [ -f ".shrug/commit$ver/$line" ]; then #Exists in repository
+                    echo "$line - deleted" >>.shrug/logFiles
+                fi
+            else
+                if [ -f ".shrug/commit$ver/$line" ]; then #Exists in repository, but inside index
+                    if ! diff -q .shrug/index/$file .shrug/commit$ver/$line>/dev/null; then
+                        echo "$line - file deleted, different changes staged for commit"
+                    else
+                        echo "$line - file deleted" >>.shrug/logFiles
+                    fi
+                else #Not existing in repository, but inside index
+                    echo "$line - added to index, file deleted" >>.shrug/logFiles
+                fi
+            fi
+        fi
+    done <.shrug/deletedFiles
+fi
+for file in *; do
+    if [ ! -f .shrug/index/$file ] #Untracked file - file doesn't exist in index
+    then
+        if [ $file != "*" ] #Ignore if index folder empty
+        then  
+            echo "$file - untracked" >>.shrug/logFiles
+        fi
+    else #Exists in index
+        if [ ! -f .shrug/commit$ver/$file ] #Doesn't Exist in recent commit
+        then
+            if [ ! -f $file ]; then #Working file doesn't exist
+                echo "$file - added to index, file deleted" >>.shrug/logFiles
+            else #Working file exists
+                if ! diff -q .shrug/index/$file $file>/dev/null; then #Index differ to root file
+                    echo "$file - added to index, file changed" >>.shrug/logFiles
+                else
+                    echo "$file - added to index" >>.shrug/logFiles
+                fi
+            fi
+        elif ! diff -q .shrug/index/$file .shrug/commit$ver/$file>/dev/null; then #Index file different to repository
+            if ! diff -q .shrug/index/$file $file>/dev/null; then #Different to root file too
+                echo "$file - file changed, different changes staged for commit" >>.shrug/logFiles
+            else
+                echo "$file - file changed, changes staged for commit" >>.shrug/logFiles
+            fi
+        elif diff -q .shrug/index/$file .shrug/commit$ver/$file>/dev/null; then #Index file same as repository
+            if ! diff -q .shrug/index/$file $file>/dev/null; then #Index different to working file
+                echo "$file - file changed, changes not staged for commit" >>.shrug/logFiles
+            else #Same file all around
+                echo "$file - same as repo" >>.shrug/logFiles
+            fi
+        fi
+    fi
+done
+
+sort .shrug/logFiles
+: > .shrug/logFiles

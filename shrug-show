@@ -1,0 +1,44 @@
+#!/bin/dash
+
+if [ ! -d ".shrug" ] #Check if .shrug exists
+then
+    echo "shrug-show: error: no .shrug directory containing shrug repository exists"
+    exit 1
+fi
+
+filename="$1"
+validfile="^[0-9]*:[a-zA-Z0-9.-_]+$"
+cd .shrug
+if echo "$filename" | egrep "$validfile">/dev/null; then #Make sure correct 'number:file' format
+    ver=`echo "$filename" | cut -d ":" -f1`
+    file=`echo "$filename" | cut -d ":" -f2`
+    if [ -z $ver ]
+    then
+        cd index
+        if [ -f $file ] #Check if file exists
+        then
+            cat $file
+        else
+            echo "shrug-show: error: '$file' not found in index"
+            exit 1
+        fi
+    else
+        if [ -d "commit$ver" ] #Check commit exists
+        then
+            cd commit$ver
+            if [ -f $file ] #Check if file exists
+            then
+                cat $file
+            else
+                echo "shrug-show: error: '$file' not found in commit $ver"
+                exit 1
+            fi
+        else
+            echo "shrug-show: error: unknown commit '$ver'"
+            exit 1
+        fi
+    fi 
+else
+    echo "usage: shrug-show <commit>:<filename>"
+    exit 1
+fi

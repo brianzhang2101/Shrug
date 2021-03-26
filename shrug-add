@@ -1,0 +1,33 @@
+#!/bin/dash
+
+index=".shrug/index"
+
+if [ -d ".shrug" ] #.shrug must exist
+then
+    if [ $# -eq 0 ]; then #Missing argument
+        echo "usage: shrug-add <filenames>"
+        exit 1
+    fi
+
+    for filename in "$@"
+    do  #file must have a valid name
+        if echo "$filename" | grep -P '^[a-zA-Z0-9\-]+(?!.*[\!\"\#\$\%\&\(\)\*\+\,\/\:\;\<\>\=\?\@\[\]\{\}\\\\\^\`\~]).*$'>/dev/null; then 
+            if [ -f $filename ]; then #File exists
+                cp "$filename" "$index/$filename"
+            else
+                if [ -f "$index/$filename" ]; then #Index file exists, copy removal of work file
+                    rm "$index/$filename"
+                else
+                    echo "shrug-add: error: can not open 'non_existent_file'"
+                    exit 1
+                fi
+            fi
+        else
+            echo "shrug-add: error: invalid filename '$filename'"
+            exit 1
+        fi
+    done
+else
+    echo "shrug-add: error: no .shrug directory containing shrug repository exists"
+    exit 1
+fi

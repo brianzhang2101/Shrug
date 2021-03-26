@@ -1,0 +1,58 @@
+#!/bin/dash
+
+if [ ! -d ".shrug" ] #Check if .shrug exists
+then
+    echo "shrug-commit: error: no .shrug directory containing shrug repository exists"
+    exit 1
+fi
+
+if [ "$#" -eq 3 ] && [ "$1" = "-a" ] && [ "$2" = "-m" ] # -a flag detected
+then
+    message=$3
+    for file in * #Scan every file in root directory
+    do
+        if [ -f .shrug/index/$file ] #Check if root's files exist in index
+        then
+            cp $file .shrug/index/$file #Replace if it exists
+        fi
+    done
+elif [ "$#" -eq 2 ] && [ "$1" = "-m" ] # just -m flag used
+then
+    message=$2
+else
+    echo "usage: shrug-commit [-a] -m commit-message"
+    exit 1
+fi
+
+cd .shrug
+if [ ! -f "version" ] #First backup
+then
+    if [ -z "$(ls -A index)" ]; then #Index is empty
+        echo "nothing to commit"
+        exit 1
+    fi
+    echo "0" >version
+    mkdir commit0
+    cp -R index/. commit0/ 
+    echo "Committed as commit 0"
+    #Add message
+    cd messages
+    touch message0
+    echo "0 $message" >message0
+else #At least one backup already
+    #Check if index files are equal to most recent commit
+    i=`cat version`
+    if diff -r commit$i index>/dev/null; then #Files are the same
+        echo "nothing to commit"
+        exit 1
+    else
+        ver=$((i+1))
+        seq $ver $ver >version
+        cp -R index/. commit$ver/
+        echo "Committed as commit $ver"
+        #Add message
+        cd messages
+        touch message$ver
+        echo "$ver $message" >message$ver
+    fi
+fi

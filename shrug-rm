@@ -1,0 +1,130 @@
+#!/bin/dash
+
+if [ ! -d ".shrug" ] #Check if .shrug exists
+then
+    echo "shrug-rm: error: no .shrug directory containing shrug repository exists"
+    exit 1
+fi
+
+if [ ! -f .shrug/version ] #Check if any commits exist
+then
+    echo "shrug-rm: error: your repository does not have any commits yet"
+    exit 1
+fi
+
+if [ $# -eq 0 ]; then #Missing arguments
+    echo "usage: shrug-rm [--force] [--cached] <filenames>"
+    exit 1
+fi
+
+invalidflag="^-+"
+force=0
+cached=0
+flag=0
+
+for arg in "$@"
+do  #Invalid filename
+    if echo "$arg" | grep -P '^[a-zA-Z0-9\-]+(?!.*[\!\"\#\$\%\&\(\)\*\+\,\/\:\;\<\>\=\?\@\[\]\{\}\\\\\^\`\~]).*$'>/dev/null; then 
+        if echo "$arg" | egrep "$invalidflag">/dev/null; then #If word starts with dash
+            if [ $arg != "--force" ] && [ $arg != "--cached" ] #If not --force or --cached, exit with usage error
+            then
+                echo "usage: shrug-rm [--force] [--cached] <filenames>"
+                exit 1
+            fi
+        fi
+    else #Invalid filename
+        echo "shrug-rm: error: invalid filename '$arg'"
+        exit 1
+    fi
+    isFile=1 #Handle difference between flags and files
+    case $arg in
+        --force)
+        force="1"
+        flag=$((flag+1))
+        isFile="0"
+        shift
+        ;;
+        --cached)
+        cached="1"
+        flag=$((flag+1))
+        isFile="0"
+        shift
+        ;;
+    esac
+    if [ -f .shrug/index/$arg ] #Index file MUST exist
+    then
+        if [ $flag -eq 2 ] #--force AND --cached turned on
+        then
+            rm .shrug/index/$arg
+        elif [ $flag -eq 1 ]
+        then
+            if [ $force -eq 1 ] #--force turned on
+            then
+                rm .shrug/index/$arg
+                if [ -f $arg ] #Check if working file exists
+                then
+                    rm $arg
+                    echo $arg >>.shrug/deletedFiles
+                fi
+                
+            elif [ $cached -eq 1 ] #--cached turned on
+            then
+                #BEGIN SAVING LOST WORK CHECKS#
+                if [ -f $arg ] #Check if working file exists
+                then
+                    ver=`cat .shrug/version`
+                    if [ -f .shrug/commit$ver/$arg ] #Repository file exists
+                    then
+                        if ! diff -q .shrug/index/$arg .shrug/commit$ver/$arg>/dev/null; then #Index different to repository AND
+                            if ! diff -q $arg .shrug/index/$arg>/dev/null; then               #Index different to working file
+                                echo "shrug-rm: error: '$arg' in index is different to both working file and repository"
+                                exit 1
+                            fi
+                        fi
+                    fi
+                fi
+                #SAVING LOST WORK CHECK OVER#
+                rm .shrug/index/$arg
+            fi
+        else #No flags
+            #BEGIN SAVING LOST WORK CHECKS#
+            if [ -f $arg ] #Check if working file exists
+            then
+                ver=`cat .shrug/version`
+                if diff $arg .shrug/index/$arg>/dev/null; then #Working and index file are same
+                    if [ ! -f .shrug/commit$ver/$arg ]
+                    then
+                        echo "shrug-rm: error: '$arg' has changes staged in the index"
+                        exit 1
+                    elif ! diff -q .shrug/index/$arg .shrug/commit$ver/$arg>/dev/null; then
+                        echo "shrug-rm: error: '$arg' has changes staged in the index"
+                        exit 1
+                    fi
+                fi
+                if [ -f .shrug/commit$ver/$arg ] #Repository file exists
+                then
+                    if ! diff -q .shrug/index/$arg .shrug/commit$ver/$arg>/dev/null; then #Index different to repository AND
+                        if ! diff -q $arg .shrug/index/$arg>/dev/null; then                   #Index different to working file
+                            echo "shrug-rm: error: '$arg' in index is different to both working file and repository"
+                            exit 1
+                        fi
+                    fi
+                    if ! diff -q $arg .shrug/commit$ver/$arg>/dev/null #If repository differs to working file
+                    then
+                        echo "shrug-rm: error: '$arg' in repository is different to working file"
+                        exit 1
+                    fi
+                fi
+                rm $arg
+                echo $arg >>.shrug/deletedFiles
+            fi
+            #SAVING LOST WORK CHECK OVER#
+            rm .shrug/index/$arg
+        fi
+    else
+        if [ $isFile -eq 1 ] #Ignore flags used as file handles
+        then
+            echo "shrug-rm: error: '$arg' is not in the shrug repository"
+        fi
+    fi
+done
