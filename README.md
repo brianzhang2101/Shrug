@@ -21,4 +21,4 @@ Prints the content of the specified file
 - If the file's deletion will cause user to lose work, let them know
 - [--force] removes not let the user know about losing their work
 # shrug-status
-- Shows the current status of files in current directory, index and repository
+Shows the current status of files in current directory, index and repository
